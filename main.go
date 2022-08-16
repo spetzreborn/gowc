@@ -59,7 +59,7 @@ func main() {
 		fmt.Printf("%d: %s\n", kv.Value, kv.Key)
 	}
 
-	fmt.Printf("\nTotal number of uniq words:%4d\n", len(wordCount))
-	fmt.Printf("Total number of words:%4d\n", wordsTotal)
-	fmt.Printf("Total number of lines:%4d\n", linesTotal)
+	fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount))
+	fmt.Printf("Total number of words:%15d\n", wordsTotal)
+	fmt.Printf("Total number of lines:%15d\n", linesTotal)
 }
