@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+type wordCounter struct {
+	words      map[string]uint
+	totalLines uint
+	totalWords uint
+}
+
 func main() {
 
 	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+")
@@ -17,32 +23,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	wordCount := make(map[string]int)
-	var wordsTotal int
-	var linesTotal int
+	wordCount := wordCounter{words: make(map[string]uint)}
 
 	scanner := bufio.NewScanner(os.Stdin)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
 
 	for scanner.Scan() {
 		words := strings.Fields(strings.ToLower(reg.ReplaceAllString(scanner.Text(), "")))
-		linesTotal++
+		wordCount.totalLines++
 		for _, w := range words {
-			wordCount[w]++
-			wordsTotal++
+			wordCount.words[w]++
+			wordCount.totalWords++
 		}
 	}
 
-	if scanner.Err() != nil {
-		// Handle error.
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Invalid input: %s", err)
 	}
 
 	type kv struct {
 		Key   string
-		Value int
+		Value uint
 	}
 
 	var ss []kv
-	for k, v := range wordCount {
+	for k, v := range wordCount.words {
 		ss = append(ss, kv{k, v})
 	}
 
@@ -59,7 +65,7 @@ func main() {
 		fmt.Printf("%d: %s\n", kv.Value, kv.Key)
 	}
 
-	fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount))
-	fmt.Printf("Total number of words:%15d\n", wordsTotal)
-	fmt.Printf("Total number of lines:%15d\n", linesTotal)
+	fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount.words))
+	fmt.Printf("Total number of words:%15d\n", wordCount.totalWords)
+	fmt.Printf("Total number of lines:%15d\n", wordCount.totalLines)
 }
