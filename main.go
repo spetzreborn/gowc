@@ -21,6 +21,8 @@ type wordCounter struct {
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+var noWordList = flag.Bool("no-word-list", false, "Don't print the wordlist")
+var noSummery = flag.Bool("no-summery", false, "Don't print the summary")
 
 func main() {
 
@@ -61,32 +63,37 @@ func main() {
 		log.Fatalf("Invalid input: %s", err)
 	}
 
-	type kv struct {
-		Key   string
-		Value uint
-	}
-
-	var ss []kv
-	for k, v := range wordCount.words {
-		ss = append(ss, kv{k, v})
-	}
-
-	sort.Slice(ss, func(i, j int) bool {
-
-		if ss[i].Value != ss[j].Value {
-			return ss[i].Value < ss[j].Value
+	if *noWordList == false {
+		type kv struct {
+			Key   string
+			Value uint
 		}
-		return ss[i].Key < ss[j].Key
 
-	})
+		var ss []kv
+		for k, v := range wordCount.words {
+			ss = append(ss, kv{k, v})
+		}
 
-	for _, kv := range ss {
-		fmt.Printf("%d: %s\n", kv.Value, kv.Key)
+		sort.Slice(ss, func(i, j int) bool {
+
+			if ss[i].Value != ss[j].Value {
+				return ss[i].Value < ss[j].Value
+			}
+			return ss[i].Key < ss[j].Key
+
+		})
+
+		for _, kv := range ss {
+			fmt.Printf("%d: %s\n", kv.Value, kv.Key)
+		}
+
 	}
 
-	fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount.words))
-	fmt.Printf("Total number of words:%15d\n", wordCount.totalWords)
-	fmt.Printf("Total number of lines:%15d\n", wordCount.totalLines)
+	if *noSummery == false {
+		fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount.words))
+		fmt.Printf("Total number of words:%15d\n", wordCount.totalWords)
+		fmt.Printf("Total number of lines:%15d\n", wordCount.totalLines)
+	}
 
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)
