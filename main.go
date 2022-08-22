@@ -19,14 +19,26 @@ type wordCounter struct {
 	totalWords uint
 }
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
-var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var noWordList = flag.Bool("no-word-list", false, "Don't print the wordlist")
-var noSummery = flag.Bool("no-summery", false, "Don't print the summary")
+var (
+	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+	/*
+		printWordList and printSummary gets inverted so it makes logical names and logical test
+	*/
+	printWordList = flag.Bool("no-word-list", false, "Don't print the wordlist")
+	printSummary  = flag.Bool("no-summary", false, "Don't print the summary")
+)
 
 func main() {
 
 	flag.Parse()
+
+	/*
+		printWordList and printSummary gets inverted so it makes logical names and logical test
+	*/
+	*printWordList = !*printWordList
+	*printSummary = !*printSummary
+
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
@@ -63,7 +75,7 @@ func main() {
 		log.Fatalf("Invalid input: %s", err)
 	}
 
-	if *noWordList == false {
+	if *printWordList {
 		type kv struct {
 			Key   string
 			Value uint
@@ -89,7 +101,7 @@ func main() {
 
 	}
 
-	if *noSummery == false {
+	if *printSummary {
 		fmt.Printf("\nTotal number of uniq words:%10d\n", len(wordCount.words))
 		fmt.Printf("Total number of words:%15d\n", wordCount.totalWords)
 		fmt.Printf("Total number of lines:%15d\n", wordCount.totalLines)
