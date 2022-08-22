@@ -69,7 +69,7 @@ func main() {
 			Value uint
 		}
 
-		var ss []kv
+		ss := make([]kv, 0, len(wordCount.words))
 		for k, v := range wordCount.words {
 			ss = append(ss, kv{k, v})
 		}
