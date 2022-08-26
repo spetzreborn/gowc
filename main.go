@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type wordCounter struct {
@@ -55,13 +56,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	linesChan := make(chan string, 1)
-	wordsChan := make(chan string, 1)
-	wordsCloser := make(chan string)
+	linesChan := make(chan string, 10)
+	wordsCloser := make(chan interface{})
 	wordCount := wordCounter{words: make(map[string]uint)}
 	var totalLines uint
 
-	go linesToWords(linesChan, wordsChan, reg)
+	c1 := linesToWords(linesChan, reg)
+	c2 := linesToWords(linesChan, reg)
+	c3 := linesToWords(linesChan, reg)
+	wordsChan := merge(c1, c2, c3)
+
 	go buildWordMap(wordsChan, wordsCloser, &wordCount)
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -69,14 +73,6 @@ func main() {
 	scanner.Buffer(buf, 1024*1024)
 
 	for scanner.Scan() {
-		/*
-			words := strings.Fields(strings.ToLower(reg.ReplaceAllString(scanner.Text(), "")))
-			wordCount.totalLines++
-			for _, w := range words {
-				wordCount.words[w]++
-				wordCount.totalWords++
-			}
-		*/
 		linesChan <- scanner.Text()
 		totalLines++
 	}
@@ -85,7 +81,7 @@ func main() {
 	}
 	close(linesChan)
 
-	_ = <-wordsCloser // wait untill map is build.
+	<-wordsCloser // wait untill map is build.
 
 	if *printWordList {
 		type kv struct {
@@ -132,22 +128,24 @@ func main() {
 	}
 }
 
-func linesToWords(linesChan, wordsChan chan string, reg *regexp.Regexp) {
-	for {
-		line, ok := <-linesChan
-		if !ok {
-			fmt.Println("DEBUG: Got close, closing wordsChan")
-			close(wordsChan)
-			return
+func linesToWords(linesChan chan string, reg *regexp.Regexp) <-chan string {
+	out := make(chan string)
+
+	fmt.Println("DEBUG: starting goroutine")
+	go func() {
+		for line := range linesChan {
+			words := strings.Fields(strings.ToLower(reg.ReplaceAllString(line, "")))
+			for _, word := range words {
+				out <- word
+			}
 		}
-		words := strings.Fields(strings.ToLower(reg.ReplaceAllString(line, "")))
-		for _, word := range words {
-			wordsChan <- word
-		}
-	}
+		fmt.Println("DEBUG: No more input, leaving gorutine")
+		close(out)
+	}()
+	return out
 }
 
-func buildWordMap(wordsChan, wordsCloser chan string, wordCount *wordCounter) {
+func buildWordMap(wordsChan <-chan string, wordsCloser chan interface{}, wordCount *wordCounter) {
 	for {
 		w, ok := <-wordsChan
 		if !ok {
@@ -158,4 +156,30 @@ func buildWordMap(wordsChan, wordsCloser chan string, wordCount *wordCounter) {
 		wordCount.words[w]++
 		wordCount.totalWords++
 	}
+}
+
+func merge(cs ...<-chan string) <-chan string {
+	var wg sync.WaitGroup
+	out := make(chan string, 200)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan string) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
