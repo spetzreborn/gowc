@@ -22,6 +22,7 @@ type wordCounter struct {
 var (
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+	debug      = flag.Bool("debug", false, "Show debug information")
 	/*
 		printWordList and printSummary gets inverted so it makes logical names and logical test
 	*/
@@ -131,15 +132,27 @@ func main() {
 func linesToWords(linesChan chan string, reg *regexp.Regexp) <-chan string {
 	out := make(chan string)
 
-	fmt.Println("DEBUG: starting goroutine")
+	if *debug {
+		fmt.Println("DEBUG: starting goroutine")
+	}
 	go func() {
+		var noLines uint
+		var noWords uint
 		for line := range linesChan {
+
 			words := strings.Fields(strings.ToLower(reg.ReplaceAllString(line, "")))
+			noLines++
+			noWords = noWords + uint(len(words))
 			for _, word := range words {
 				out <- word
 			}
 		}
-		fmt.Println("DEBUG: No more input, leaving gorutine")
+
+		var avg float64
+		avg = float64(noWords) / float64(noLines)
+		if *debug {
+			fmt.Printf("DEBUG: Leaving gorutine statistics: lines: %d words: %d word/line avg: %.2f\n", noLines, noWords, avg)
+		}
 		close(out)
 	}()
 	return out
@@ -149,7 +162,9 @@ func buildWordMap(wordsChan <-chan string, wordsCloser chan interface{}, wordCou
 	for {
 		w, ok := <-wordsChan
 		if !ok {
-			fmt.Println("DEBUG: Got close, closing wordsCloser")
+			if *debug {
+				fmt.Println("DEBUG: Got close, closing wordsCloser")
+			}
 			close(wordsCloser)
 			return
 		}
