@@ -20,9 +20,10 @@ type wordCounter struct {
 }
 
 var (
-	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to `file`")
-	memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-	debug      = flag.Bool("debug", false, "Show debug information")
+	cpuprofile         = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile         = flag.String("memprofile", "", "write memory profile to `file`")
+	debug              = flag.Bool("debug", false, "Show debug information")
+	numGoRoutinesFlags = flag.Int("number-goroutines", 0, "Number of gorutines for wordsplitting. Default number of CPU's minus one")
 	/*
 		printWordList and printSummary gets inverted so it makes logical names and logical test
 	*/
@@ -52,6 +53,18 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	// Calculates number of goroutines
+	var numGoRoutines int
+	switch *numGoRoutinesFlags {
+	case 0:
+		numGoRoutines = runtime.NumCPU() - 1
+	default:
+		numGoRoutines = *numGoRoutinesFlags
+	}
+	if numGoRoutines < 1 {
+		numGoRoutines = 1
+	}
+
 	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+")
 	if err != nil {
 		log.Fatal(err)
@@ -62,10 +75,11 @@ func main() {
 	wordCount := wordCounter{words: make(map[string]uint)}
 	var totalLines uint
 
-	c1 := linesToWords(linesChan, reg)
-	c2 := linesToWords(linesChan, reg)
-	c3 := linesToWords(linesChan, reg)
-	wordsChan := merge(c1, c2, c3)
+	var cs []<-chan string
+	for i := 0; i < numGoRoutines; i++ {
+		cs = append(cs, linesToWords(linesChan, reg))
+	}
+	wordsChan := merge(cs...)
 
 	go buildWordMap(wordsChan, wordsCloser, &wordCount)
 
