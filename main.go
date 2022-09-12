@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"regexp"
@@ -87,7 +88,20 @@ func main() {
 
 	go buildWordMap(wordsChan, wordsCloser, &wordCount)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	//	Determine if we are reading a file or stdin,
+	var in io.Reader
+	if filename := flag.Arg(0); filename != "" {
+		f, err := os.Open(filename)
+		if err != nil {
+			fmt.Println("error opening file: err: ", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		in = f
+	} else {
+		in = os.Stdin
+	}
+	scanner := bufio.NewScanner(in)
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
