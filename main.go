@@ -23,7 +23,7 @@ var (
 	cpuprofile         = flag.String("cpuprofile", "", "write cpu profile to `file`")
 	memprofile         = flag.String("memprofile", "", "write memory profile to `file`")
 	debug              = flag.Bool("debug", false, "Show debug information")
-	numGoRoutinesFlags = flag.Int("number-goroutines", 0, "Number of gorutines for wordsplitting. Default number of CPU's minus one")
+	numGoRoutinesFlags = flag.Int("number-goroutines", 0, "Number of gorutines for wordsplitting. Defaults to all CPU threads but 2")
 	/*
 		printWordList and printSummary gets inverted so it makes logical names and logical test
 	*/
@@ -57,7 +57,7 @@ func main() {
 	var numGoRoutines int
 	switch *numGoRoutinesFlags {
 	case 0:
-		numGoRoutines = runtime.NumCPU() - 1
+		numGoRoutines = runtime.NumCPU() - 2
 	default:
 		numGoRoutines = *numGoRoutinesFlags
 	}
@@ -65,16 +65,20 @@ func main() {
 		numGoRoutines = 1
 	}
 
+	linesChan := make(chan string, 10)
+	wordsCloser := make(chan interface{})
+	wordCount := wordCounter{words: make(map[string]uint)}
+
+	// Regular expression for capturing legal words and characters.
 	reg, err := regexp.Compile("[^a-zA-Z0-9 ]+")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	linesChan := make(chan string, 10)
-	wordsCloser := make(chan interface{})
-	wordCount := wordCounter{words: make(map[string]uint)}
-	var totalLines uint
-
+	/*
+		Start "linesToWord" workers, default all but two CPU threads.
+		Also start one collector that sends all results to buildWordMap
+	*/
 	var cs []<-chan string
 	for i := 0; i < numGoRoutines; i++ {
 		cs = append(cs, linesToWords(linesChan, reg))
@@ -87,6 +91,7 @@ func main() {
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
+	var totalLines uint
 	for scanner.Scan() {
 		linesChan <- scanner.Text()
 		totalLines++
