@@ -66,7 +66,7 @@ func main() {
 		numGoRoutines = 1
 	}
 
-	linesChan := make(chan string, 10)
+	linesChan := make(chan string, numGoRoutines*100)
 	wordsCloser := make(chan interface{})
 	wordCount := wordCounter{words: make(map[string]uint)}
 
